@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -17,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Upload, FileImage, AlertCircle, CheckCircle, Download, Mail, Search } from "lucide-react"
+import { Upload, FileImage, AlertCircle, CheckCircle, Search } from "lucide-react"
 import {
   isValidMatricula,
   getCityFromMatricula,
@@ -31,7 +30,6 @@ interface StudentData {
   schoolName: string
   gradeLevel: string
   course: string
-  registrationNumber: string
   studentIdNumber: string
   schoolAddress: string
   contactInfo: string
@@ -119,7 +117,6 @@ export function StudentIdForm() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
-  const [sendByEmail, setSendByEmail] = useState(false)
   const [emailAddress, setEmailAddress] = useState("")
 
   const photoInputRef = useRef<HTMLInputElement>(null)
@@ -184,7 +181,6 @@ export function StudentIdForm() {
         schoolName: "",
         gradeLevel: "",
         course: "",
-        registrationNumber: "",
         studentIdNumber: "",
         schoolAddress: "Nova Ponte, MG",
         contactInfo: "",
@@ -202,7 +198,6 @@ export function StudentIdForm() {
     schoolName: "",
     gradeLevel: "",
     course: "",
-    registrationNumber: "",
     studentIdNumber: "",
     schoolAddress: "Nova Ponte, MG",
     contactInfo: "",
@@ -292,12 +287,10 @@ export function StudentIdForm() {
       newErrors.institution = "Instituição de ensino é obrigatória"
     }
 
-    if (sendByEmail) {
-      if (!emailAddress.trim()) {
-        newErrors.email = "E-mail é obrigatório para envio por e-mail"
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddress)) {
-        newErrors.email = "Por favor, insira um e-mail válido"
-      }
+    if (!emailAddress.trim()) {
+      newErrors.email = "E-mail é obrigatório"
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddress)) {
+      newErrors.email = "Por favor, insira um e-mail válido"
     }
 
     setErrors(newErrors)
@@ -342,17 +335,14 @@ export function StudentIdForm() {
       formDataToSend.append("schoolName", formData.schoolName)
       formDataToSend.append("gradeLevel", formData.gradeLevel)
       formDataToSend.append("course", formData.course)
-      formDataToSend.append("registrationNumber", formData.registrationNumber)
       formDataToSend.append("studentIdNumber", formData.studentIdNumber)
       formDataToSend.append("schoolAddress", formData.schoolAddress)
       formDataToSend.append("contactInfo", formData.contactInfo)
       formDataToSend.append("city", formData.city)
       formDataToSend.append("transportType", formData.transportType)
       formDataToSend.append("institution", formData.institution)
-      formDataToSend.append("sendByEmail", sendByEmail.toString())
-      if (sendByEmail) {
-        formDataToSend.append("emailAddress", emailAddress)
-      }
+      formDataToSend.append("sendByEmail", "true")
+      formDataToSend.append("emailAddress", emailAddress)
 
       if (formData.photo) {
         formDataToSend.append("photo", formData.photo)
@@ -364,23 +354,23 @@ export function StudentIdForm() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Erro ao gerar PDF")
+        const contentType = response.headers.get("content-type")
+        let errorMessage = "Erro ao gerar PDF"
+
+        if (contentType && contentType.includes("application/json")) {
+          try {
+            const errorData = await response.json()
+            errorMessage = errorData.error || errorMessage
+          } catch (jsonError) {
+            console.error("Error parsing error response:", jsonError)
+          }
+        }
+
+        throw new Error(errorMessage)
       }
 
-      if (!sendByEmail) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        const studentData = getStudentData(formData.studentIdNumber)
-        const studentName = studentData?.name || formData.fullName
-        a.download = `${studentName.replace(/\s+/g, "-").toLowerCase()}.pdf`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-      }
+      const result = await response.json()
+      console.log("[v0] Email sent successfully:", result.message)
 
       setGeneratedDocuments((prev) => new Set(prev).add(formData.studentIdNumber))
       setSubmitSuccess(true)
@@ -400,17 +390,8 @@ export function StudentIdForm() {
           <AlertDescription className="text-accent-foreground">
             <strong>Carteira gerada com sucesso!</strong>
             <br />
-            {sendByEmail ? (
-              <>
-                Sua carteira de estudante digital foi enviada para o e-mail {emailAddress}. Verifique sua caixa de
-                entrada e pasta de spam.
-              </>
-            ) : (
-              <>
-                Sua carteira de estudante digital foi gerada e o download iniciou automaticamente. Se o download não
-                iniciou, verifique a pasta de downloads do seu navegador.
-              </>
-            )}
+            Sua carteira de estudante digital foi enviada para o e-mail {emailAddress}. Verifique sua caixa de entrada e
+            pasta de spam.
           </AlertDescription>
         </Alert>
 
@@ -427,7 +408,6 @@ export function StudentIdForm() {
                 schoolName: "",
                 gradeLevel: "",
                 course: "",
-                registrationNumber: "",
                 studentIdNumber: "",
                 schoolAddress: "Nova Ponte, MG",
                 contactInfo: "",
@@ -437,7 +417,6 @@ export function StudentIdForm() {
                 institution: "",
               })
               setErrors({})
-              setSendByEmail(false)
               setEmailAddress("")
             }}
             className="w-full"
@@ -535,7 +514,7 @@ export function StudentIdForm() {
             </div>
             {lookupError && (
               <p className="text-sm text-destructive flex items-center gap-1">
-                <AlertCircle className="h-4 w-4" />
+                <AlertCircle className="h-3 w-3" />
                 {lookupError}
               </p>
             )}
@@ -804,17 +783,6 @@ export function StudentIdForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="registrationNumber">Número de Registro Adicional</Label>
-              <Input
-                id="registrationNumber"
-                value={formData.registrationNumber}
-                onChange={(e) => handleInputChange("registrationNumber", e.target.value)}
-                placeholder="Número adicional, se aplicável"
-                disabled={!isFormEnabled}
-              />
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="schoolAddress">Endereço da Instituição</Label>
               <Input
                 id="schoolAddress"
@@ -892,73 +860,38 @@ export function StudentIdForm() {
 
           {/* Delivery Options */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">Opções de Entrega</h3>
+            <h3 className="text-lg font-semibold text-foreground">E-mail para Entrega</h3>
 
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="sendByEmail"
-                  checked={sendByEmail}
-                  onCheckedChange={(checked) => {
-                    setSendByEmail(checked as boolean)
-                    if (!checked) {
-                      setEmailAddress("")
-                      setErrors((prev) => ({ ...prev, email: "" }))
-                    }
-                  }}
-                  disabled={!isFormEnabled}
-                />
-                <Label htmlFor="sendByEmail" className="flex items-center gap-2">
-                  <Mail className="h-4 w-4" />
-                  Enviar carteira por e-mail
-                </Label>
-              </div>
-
-              {sendByEmail && (
-                <div className="space-y-2 ml-6">
-                  <Label htmlFor="emailAddress">E-mail para envio *</Label>
-                  <Input
-                    id="emailAddress"
-                    type="email"
-                    value={emailAddress}
-                    onChange={(e) => {
-                      setEmailAddress(e.target.value)
-                      if (errors.email) {
-                        setErrors((prev) => ({ ...prev, email: "" }))
-                      }
-                    }}
-                    placeholder="seu-email@exemplo.com"
-                    className={errors.email ? "border-destructive" : ""}
-                    disabled={!isFormEnabled}
-                  />
-                  {errors.email && (
-                    <p className="text-sm text-destructive flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      {errors.email}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    A carteira será enviada como anexo PDF para este e-mail
-                  </p>
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="emailAddress">E-mail para envio da carteira *</Label>
+              <Input
+                id="emailAddress"
+                type="email"
+                value={emailAddress}
+                onChange={(e) => {
+                  setEmailAddress(e.target.value)
+                  if (errors.email) {
+                    setErrors((prev) => ({ ...prev, email: "" }))
+                  }
+                }}
+                placeholder="seu-email@exemplo.com"
+                className={errors.email ? "border-destructive" : ""}
+                disabled={!isFormEnabled}
+              />
+              {errors.email && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {errors.email}
+                </p>
               )}
-
-              {!sendByEmail && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground ml-6">
-                  <Download className="h-4 w-4" />A carteira será baixada automaticamente no seu dispositivo
-                </div>
-              )}
+              <p className="text-xs text-muted-foreground">A carteira será enviada como anexo PDF para este e-mail</p>
             </div>
           </div>
 
           {/* Submit Button */}
           <div className="pt-4">
             <Button type="submit" className="w-full" disabled={isSubmitting || !isFormEnabled} size="lg">
-              {isSubmitting
-                ? "Gerando Carteira..."
-                : sendByEmail
-                  ? "Gerar e Enviar por E-mail"
-                  : "Gerar e Baixar Carteira"}
+              {isSubmitting ? "Gerando e Enviando Carteira..." : "Gerar e Enviar Carteira por E-mail"}
             </Button>
           </div>
 

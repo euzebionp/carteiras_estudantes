@@ -15,7 +15,6 @@ export async function POST(request: NextRequest) {
       schoolName: formData.get("schoolName") as string,
       gradeLevel: formData.get("gradeLevel") as string,
       course: formData.get("course") as string,
-      registrationNumber: formData.get("registrationNumber") as string,
       studentIdNumber: studentIdNumber,
       schoolAddress: formData.get("schoolAddress") as string,
       contactInfo: formData.get("contactInfo") as string,
@@ -26,7 +25,7 @@ export async function POST(request: NextRequest) {
       rg: studentFromDb?.rg || "",
     }
 
-    const sendByEmail = formData.get("sendByEmail") === "true"
+    const sendByEmail = true
     const emailAddress = formData.get("emailAddress") as string
 
     const requiredFields = [
@@ -50,37 +49,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Foto é obrigatória" }, { status: 400 })
     }
 
-    if (sendByEmail && !emailAddress) {
-      return NextResponse.json({ error: "E-mail é obrigatório para envio por e-mail" }, { status: 400 })
+    if (!emailAddress) {
+      return NextResponse.json({ error: "E-mail é obrigatório" }, { status: 400 })
     }
 
     const pdfBlob = await generateStudentIdPDF(studentData)
 
-    if (sendByEmail) {
-      try {
-        console.log(`[v0] Mock email sent to ${emailAddress} for student ${studentData.fullName}`)
+    try {
+      console.log(`[v0] Mock email sent to ${emailAddress} for student ${studentData.fullName}`)
 
-        return NextResponse.json({
-          success: true,
-          message: "Carteira enviada por e-mail com sucesso",
-        })
-      } catch (emailError) {
-        console.error("Error sending email:", emailError)
-        return NextResponse.json(
-          { error: "Erro ao enviar e-mail. Tente novamente ou baixe diretamente." },
-          { status: 500 },
-        )
-      }
-    } else {
-      // Return PDF for direct download
-      const buffer = await pdfBlob.arrayBuffer()
-
-      return new NextResponse(buffer, {
-        headers: {
-          "Content-Type": "application/pdf",
-          "Content-Disposition": `attachment; filename="carteira-estudante-${studentData.fullName.replace(/\s+/g, "-").toLowerCase()}.pdf"`,
-        },
+      return NextResponse.json({
+        success: true,
+        message: "Carteira enviada por e-mail com sucesso",
       })
+    } catch (emailError) {
+      console.error("Error sending email:", emailError)
+      return NextResponse.json({ error: "Erro ao enviar e-mail. Tente novamente." }, { status: 500 })
     }
   } catch (error) {
     console.error("Error generating PDF:", error)
