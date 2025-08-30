@@ -364,25 +364,11 @@ export function StudentIdForm() {
       })
 
       if (!response.ok) {
-        const contentType = response.headers.get("content-type")
-        let errorMessage = "Erro ao gerar PDF"
-
-        if (contentType && contentType.includes("application/json")) {
-          try {
-            const errorData = await response.json()
-            errorMessage = errorData.error || errorMessage
-          } catch (jsonError) {
-            console.error("Error parsing error response:", jsonError)
-          }
-        }
-
-        throw new Error(errorMessage)
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Erro ao gerar PDF")
       }
 
-      if (sendByEmail) {
-        const result = await response.json()
-        console.log("[v0] Email sent successfully:", result.message)
-      } else {
+      if (!sendByEmail) {
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement("a")
