@@ -364,8 +364,17 @@ export function StudentIdForm() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Erro ao gerar PDF")
+        let errorMessage = "Erro ao gerar PDF"
+        try {
+          const contentType = response.headers.get("content-type")
+          if (contentType && contentType.includes("application/json")) {
+            const errorData = await response.json()
+            errorMessage = errorData.error || errorMessage
+          }
+        } catch (parseError) {
+          console.error("Error parsing error response:", parseError)
+        }
+        throw new Error(errorMessage)
       }
 
       if (!sendByEmail) {
@@ -373,9 +382,16 @@ export function StudentIdForm() {
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement("a")
         a.href = url
+
+        // Get student name from database first, then fallback to form data
         const studentData = getStudentData(formData.studentIdNumber)
         const studentName = studentData?.name || formData.fullName
-        a.download = `${studentName.replace(/\s+/g, "-").toLowerCase()}.pdf`
+        const fileName = studentName
+          .replace(/\s+/g, "-")
+          .toLowerCase()
+          .replace(/[^a-z0-9-]/g, "") // Remove special characters
+
+        a.download = `${fileName}.pdf`
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
@@ -386,7 +402,7 @@ export function StudentIdForm() {
       setSubmitSuccess(true)
     } catch (error) {
       console.error("Erro ao gerar carteira:", error)
-      setErrors({ submit: error instanceof Error ? error.message : "Erro desconhecido" })
+      setErrors({ submit: error instanceof Error ? error.message : "Erro desconhecido ao gerar carteira" })
     } finally {
       setIsSubmitting(false)
     }
